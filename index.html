@@ -4,36 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>铁屋子 · 文学</title>
-<!-- Supabase 客户端：自托管优先，多个 CDN 依次兜底 -->
-<script>
-(function(){
-var CDNS=[
-"supabase.js",
-"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js",
-"https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js",
-"https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/supabase-js.min.js",
-"https://cdn.staticfile.net/supabase-js/2.45.4/supabase-js.min.js"
-];
-var i=0;
-window.__tsAllCdnFailed=false;
-function ready(){return !!(window.supabase&&window.supabase.createClient);}
-function done(url){
-window.__tsCdnUsed=url;
-try{console.log("[铁屋子] supabase 来自 "+url);}catch(e){}
-try{window.dispatchEvent(new Event("ts-supabase-ready"));}catch(e){}
-}
-function next(){
-if(ready())return done("(已就绪)");
-if(i>=CDNS.length){window.__tsAllCdnFailed=true;return;}
-var url=CDNS[i++],s=document.createElement("script");
-s.src=url;
-s.onload=function(){if(ready())done(url);else next();};
-s.onerror=function(){next();};
-document.head.appendChild(s);
-}
-next();
-})();
-</script>
+<!-- Supabase 客户端：本地自托管（与 index.html 同级） -->
+<script src="supabase.js" onerror="window.__tsAllCdnFailed=true"></script>
 <style>
 :root{--ink:#1a1a1a;--coal:#141414;--i78:rgba(26,26,26,.78);--i62:rgba(26,26,26,.62);--i46:rgba(26,26,26,.46);--i22:rgba(26,26,26,.22);--i12:rgba(26,26,26,.12);--paper:#ece8dc;--phi:#f4f0e6;--phi2:#f7f3e7;--plo:#ddd7c6;--blood:#8b0000;--bd:#6d0000;--veil:rgba(236,232,220,.86);--kai:"STKaiti","Kaiti SC","楷体",KaiTi,serif;--song:"Songti SC","宋体",SimSun,STSong,serif;
 --trace-h:radial-gradient(46px 2px at 8% 50%,rgba(139,0,0,.55),rgba(139,0,0,0) 100%),radial-gradient(22px 2px at 23% 44%,rgba(139,0,0,.32),rgba(139,0,0,0) 100%),radial-gradient(72px 2px at 43% 56%,rgba(139,0,0,.45),rgba(139,0,0,0) 100%),radial-gradient(28px 2px at 63% 47%,rgba(139,0,0,.28),rgba(139,0,0,0) 100%),radial-gradient(58px 2px at 85% 53%,rgba(139,0,0,.5),rgba(139,0,0,0) 100%);
@@ -487,7 +459,7 @@ var KAI='"STKaiti","Kaiti SC","楷体",KaiTi,serif',SONG='"Songti SC","宋体",S
 var FALLBACK_NAME="无名之辈";
 var LQ="\u201c",RQ="\u201d";
 var STAMP_SLOTS=[{r:8,b:34},{r:44,b:52},{r:16,b:68},{r:56,b:28},{r:34,b:86},{r:70,b:64}];
-/* 云端客户端：等脚本到位再连，迟到也不怕 */
+/* 云端客户端 */
 var SB=null,sbBooted=false;
 function makeClient(){
 try{
@@ -512,9 +484,9 @@ SB=makeClient();
 if(SB){state.err="";refreshWall();}
 else{
 state.loading=false;
-state.err="Supabase 脚本没能加载（CDN 均不通或离线）。先看本地留底，连上网络后刷新即可。";
+state.err="supabase.js 没能加载（文件不在同级目录、名字大小写不对，或下成了 ESM 版）。先看本地留底。";
 renderWall();
-toast("云端脚本没加载上，先看本地留底。",true);
+toast("supabase.js 没加载上，先看本地留底。",true);
 }
 }
 window.addEventListener("ts-supabase-ready",function(){cloudBoot();});
@@ -527,28 +499,40 @@ function fmtCnDate(t){var d=(typeof t==="number"&&t>0)?new Date(t):new Date();re
 function hash(s){var h=2166136261;s=String(s);for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
 function rng(seed){var s=hash(seed)||123456789;return function(){s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};}
 function uid(p){return p+Date.now()+Math.random().toString(36).slice(2,6);}
+/* 缺列判定 */
+function missingColName(e){
+var m=String((e&&(e.message||e.details||e.hint||e.code))||"");
+if(!/PGRST204|schema cache|does not exist|Could not find/i.test(m))return "";
+var a=m.match(/Could not find the '([^']+)' column/i)||m.match(/column "?([A-Za-z_][A-Za-z0-9_]*)"? (?:of relation .* )?does not exist/i);
+return a?a[1]:"";
+}
+function isMissingColumn(e){return !!missingColName(e);}
 function errMsg(e){
-if(!cloudOK())return "Supabase 脚本没加载上：CDN 不通或离线，刷新再试";
+if(!cloudOK())return "supabase.js 没加载上（文件位置或名字不对）";
 if(!e)return "出了点故障";
+var col=missingColName(e);
+if(col)return "库里没有「"+col+"」这一列（文末 SQL 可补）";
 var m=String(e.message||e.error_description||e.details||e.code||e);
 if(/Failed to fetch|NetworkError|Load failed|fetch|timeout/i.test(m))return "连不上云端：网络不稳，或项目被暂停了";
-if(/relation|does not exist|schema cache|Could not find the table|column/i.test(m))return "表名或字段对不上";
+if(/relation|does not exist|schema cache|Could not find the table/i.test(m))return "表名对不上（articles / comments）";
 if(/row-level security|permission denied|violates row-level/i.test(m))return "被 RLS 挡住了";
+if(/invalid input syntax|type .* does not match|foreign key/i.test(m))return "id 类型不匹配（articles.id 与 comments.article_id 要同为 bigint）";
 if(/duplicate|invalid input|violates/i.test(m))return "数据不合云端规矩";
 return m.slice(0,90);
 }
-/* 字段兜底 */
+/* 字段兜底：正文列名 content 优先 */
 function normArticle(r){
 if(!r||typeof r!=="object")return null;
 var id=(r.id==null)?"":String(r.id);
 if(!id)return null;
 var ms=Date.parse(r.created_at||r.inserted_at||r.createdAt||r.time||"");
 if(isNaN(ms))ms=Date.now();
+var bodyCol=(r.content!=null)?r.content:((r.body==null)?"":r.body);
 return {
 id:id,
 title:String(r.title==null?"无题":r.title),
-category:String(r.category==null?(r.column==null?"未归档":r.column):r.category),
-body:String(r.body==null?(r.content==null?"":r.content):r.body),
+category:String(r.category==null?(r.column==null?"":r.column):r.category),
+body:String(bodyCol),
 pen:String(r.author_name==null?(r.pen==null?FALLBACK_NAME:r.pen):r.author_name),
 contact:String(r.contact==null?"":r.contact),
 status:String(r.status==null?"pending":r.status),
@@ -578,11 +562,27 @@ var arr=(res.data||[]).map(normArticle).filter(Boolean);
 arr.sort(function(a,b){return b.time-a.time;});
 return arr;
 }
+var ART_SHAPE=-1;
+function articlePayloads(m){
+return [
+{title:m.title,category:m.category,content:m.body,author_name:m.pen,contact:m.contact,status:"pending"},
+{title:m.title,content:m.body,author_name:m.pen,status:"pending"}
+];
+}
 async function dbInsertArticle(m){
 if(!cloudOK())throw new Error("no client");
-var res=await SB.from("articles").insert({title:m.title,category:m.category,body:m.body,author_name:m.pen,contact:m.contact,status:"pending"}).select();
-if(res.error)throw res.error;
+var list=articlePayloads(m);
+for(var i=0;i<list.length;i++){
+if(ART_SHAPE>=0&&i<ART_SHAPE)continue;
+var res=await SB.from("articles").insert(list[i]).select();
+if(!res.error){
+if(i===1&&ART_SHAPE<0)toast("已投出；栏目与联系方式暂未入库（库里还没有这两列）。",true);
+ART_SHAPE=i;
 return (res.data&&res.data[0])?normArticle(res.data[0]):null;
+}
+if(!isMissingColumn(res.error))throw res.error;
+}
+throw new Error("articles 表结构与已知形态都对不上");
 }
 async function dbSetStatus(id,status){
 var res=await SB.from("articles").update({status:status}).eq("id",id).select();
@@ -615,10 +615,25 @@ out[k]=(out[k]||0)+1;
 });
 return out;
 }
+var CM_SHAPE=-1;
+function commentPayloads(c){
+return [
+{article_id:c.articleId,quote:c.quote||"",note:c.note,author_name:c.author},
+{article_id:c.articleId,note:c.note,author_name:c.author},
+{article_id:c.articleId,content:c.note,author_name:c.author},
+{article_id:c.articleId,note:c.note}
+];
+}
 async function dbInsertComment(c){
-var res=await SB.from("comments").insert({article_id:c.articleId,quote:c.quote||"",note:c.note,author_name:c.author}).select();
-if(res.error)throw res.error;
-return (res.data&&res.data[0])?normComment(res.data[0]):null;
+if(!cloudOK())throw new Error("no client");
+var list=commentPayloads(c);
+var start=(CM_SHAPE>=0)?CM_SHAPE:0;
+for(var i=start;i<list.length;i++){
+var res=await SB.from("comments").insert(list[i]).select();
+if(!res.error){CM_SHAPE=i;return (res.data&&res.data[0])?normComment(res.data[0]):null;}
+if(!isMissingColumn(res.error))throw res.error;
+}
+throw new Error("comments 表结构与已知形态都对不上");
 }
 async function dbDeleteComment(id){
 var res=await SB.from("comments").delete().eq("id",id);
@@ -882,7 +897,7 @@ function stampOnce(m){addReso(m.id);renderWall();toast("印章已盖在卡片上
 async function refreshWall(){
 if(!cloudOK()){
 state.articles=cacheLoad(); state.loading=false;
-state.err="Supabase 脚本没加载上。先看本地留底。";
+state.err="supabase.js 没加载上。先看本地留底。";
 renderWall(); return;
 }
 state.loading=true; state.err=""; renderWall();
@@ -915,6 +930,7 @@ function validate(){
 clearErrs();
 var d=readForm(),first=null;
 function fail(k,msg){setErr(k,msg);if(!first)first=k;}
+if(!readerName())fail("pen","先报上名号，再落笔。");
 if(!d.pen)fail("pen","请先在右上角报上名号。");
 if(!d.contact)fail("contact","留一个能找到你的去处。");
 if(!d.title)fail("title","总得有个标题。");
@@ -1432,7 +1448,7 @@ var d=document.createElement("article"); d.className="adm-item";
 var t=document.createElement("h3"); t.className="adm-t"; t.textContent=m.title||"无题";
 d.appendChild(t);
 var mm=document.createElement("p"); mm.className="adm-m";
-mm.innerHTML=esc(m.category)+" · "+esc(m.pen)+" · "+esc(fmt(m.time))+" · id "+esc(m.id)+' · 状态 <span class="st">'+esc(m.status)+"</span>";
+mm.innerHTML=esc(m.category||"未分类")+" · "+esc(m.pen)+" · "+esc(fmt(m.time))+" · id "+esc(m.id)+' · 状态 <span class="st">'+esc(m.status)+"</span>";
 d.appendChild(mm);
 if(m.contact){var c=document.createElement("p"); c.className="adm-m"; c.textContent="联系方式："+m.contact;d.appendChild(c);}
 var bd=document.createElement("div"); bd.className="adm-body"; bd.textContent=m.body||"";
@@ -1564,7 +1580,7 @@ if($("posterModal").classList.contains("on")){closePoster();return;}
 if($("previewModal").classList.contains("on")){closePreview();return;}
 if($("readModal").classList.contains("on")){closeRead();return;}
 });
-/* init：先把留底画出来，再去连云端 */
+/* init */
 buildCats();
 state.articles=cacheLoad();
 state.loading=true;
